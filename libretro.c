@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #include <retro_miscellaneous.h>
 
@@ -102,6 +103,7 @@ static struct retro_perf_callback perf_cb;
 #ifndef PATH_MAX
 #define PATH_MAX  4096
 #endif
+#define MAX_DISKS 10  // Need to check max number of disks on MSX
 
 static char base_dir[PATH_MAX];
 
@@ -216,11 +218,51 @@ int get_media_type(const char* filename)
 
 /* end .dsk support */
 /* .dsk swap support */
+
+static char disk_paths[MAX_DISKS][PATH_MAX]; // Stores disk paths
+static char disk_labels[MAX_DISKS][256]; // Stores disk labels
+
 struct retro_disk_control_callback dskcb;
-unsigned disk_index = 0;
-unsigned disk_images = 0;
-char disk_paths[10][PATH_MAX];
-bool disk_inserted = false;
+
+bool replace_image_index(unsigned index, const struct retro_game_info *info)
+{
+    if (get_media_type(info->path) != MEDIA_TYPE_DISK)
+        return false; /* Can't swap a cart or tape into a disk slot */
+    
+    strncpy(disk_paths[index], info->path, PATH_MAX - 1);
+    disk_paths[index][PATH_MAX - 1] = '\0'; // Ensure null termination
+
+    // Extract disk label from filename
+    const char *filename = strrchr(info->path, '/');  
+    if (!filename) filename = info->path;  
+    else filename++;  // Move past the '/'
+
+    strncpy(disk_labels[index], filename, sizeof(disk_labels[index]) - 1);
+    disk_labels[index][sizeof(disk_labels[index]) - 1] = '\0'; // Null terminate
+
+    return true;
+}
+
+bool get_image_path(unsigned index, char *path, size_t len)
+{
+    if (index >= MAX_DISKS || !disk_paths[index][0])
+        return false; // Invalid index or empty slot
+
+    strncpy(path, disk_paths[index], len - 1);
+    path[len - 1] = '\0';
+    return true;
+}
+
+bool get_image_label(unsigned index, char *label, size_t len)
+{
+    if (index >= MAX_DISKS || !disk_labels[index][0])
+        return false; // Invalid index or empty slot
+
+    strncpy(label, disk_labels[index], len - 1);
+    label[len - 1] = '\0';
+    return true;
+}
+
 
 bool set_eject_state(bool ejected)
 {
@@ -289,6 +331,7 @@ void attach_disk_swap_interface(void)
    dskcb.get_num_images  = get_num_images;
    dskcb.add_image_index = add_image_index;
    dskcb.replace_image_index = replace_image_index;
+   dskcb.get_image_label = get_image_label; // Add label callback
 
    environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &dskcb);
 }
