@@ -104,6 +104,11 @@ static struct retro_perf_callback perf_cb;
 #define PATH_MAX  4096
 #endif
 #define MAX_DISKS 10  // Need to check max number of disks on MSX
+static char disk_paths[MAX_DISKS][PATH_MAX]; // Disk paths
+static char disk_labels[MAX_DISKS][256];     // Disk labels
+static unsigned disk_index = 0;  // Current disk index
+static unsigned disk_images = 0; // Total number of disk images
+static bool disk_inserted = false;
 
 static char base_dir[PATH_MAX];
 
@@ -311,15 +316,6 @@ bool add_image_index(void)
    return true;
 }
 
-bool replace_image_index(unsigned index,
-      const struct retro_game_info *info)
-{
-   if(get_media_type(info->path) != MEDIA_TYPE_DISK)
-       return false; /* can't swap a cart or tape into a disk slot */
-    
-   strcpy(disk_paths[index], info->path);
-   return true;
-}
 
 void attach_disk_swap_interface(void)
 {
@@ -331,7 +327,6 @@ void attach_disk_swap_interface(void)
    dskcb.get_num_images  = get_num_images;
    dskcb.add_image_index = add_image_index;
    dskcb.replace_image_index = replace_image_index;
-   dskcb.get_image_label = get_image_label; // Add label callback
 
    environ_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE, &dskcb);
 }
